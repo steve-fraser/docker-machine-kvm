@@ -3,7 +3,7 @@ package kvm
 import (
 	"archive/tar"
 	"bytes"
-	"encoding/json"
+	//"encoding/json"
 	"encoding/xml"
 	"errors"
 	"fmt"
@@ -14,19 +14,20 @@ import (
 	"strings"
 	"text/template"
 	"time"
+	"syscall"
 
 	libvirt "github.com/libvirt/libvirt-go"
 
-	"github.com/docker/machine/libmachine/drivers"
-	"github.com/docker/machine/libmachine/log"
-	"github.com/docker/machine/libmachine/mcnflag"
-	"github.com/docker/machine/libmachine/mcnutils"
-	"github.com/docker/machine/libmachine/ssh"
-	"github.com/docker/machine/libmachine/state"
+	"github.com/rancher/machine/libmachine/drivers"
+	"github.com/rancher/machine/libmachine/log"
+	"github.com/rancher/machine/libmachine/mcnflag"
+	"github.com/rancher/machine/libmachine/mcnutils"
+	"github.com/rancher/machine/libmachine/ssh"
+	"github.com/rancher/machine/libmachine/state"
 )
 
 const (
-	connectionString   = "qemu:///system"
+	connectionString   = "qemu+tcp://192.168.7.67/system"
 	privateNetworkName = "docker-machines"
 	isoFilename        = "boot2docker.iso"
 	dnsmasqLeases      = "/var/lib/libvirt/dnsmasq/%s.leases"
@@ -55,14 +56,16 @@ const (
       <source file='{{.DiskPath}}'/>
       <target dev='hda' bus='ide'/>
     </disk>
-    <graphics type='vnc' autoport='yes' listen='127.0.0.1'>
+    <graphics type='vnc' autoport='yes' websocket='-1' listen='127.0.0.1'>
       <listen type='address' address='127.0.0.1'/>
     </graphics>
     <interface type='network'>
-      <source network='{{.Network}}'/>
+	  <source network='{{.Network}}'/>
+	  <model type='virtio'/>
     </interface>
     <interface type='network'>
-      <source network='{{.PrivateNetwork}}'/>
+	  <source network='{{.PrivateNetwork}}'/>
+	  <model type='virtio'/>
     </interface>
   </devices>
 </domain>`
@@ -343,44 +346,80 @@ func (d *Driver) PreCreateCheck() error {
 	// Others...?
 	return nil
 }
+func (d *Driver) publicSSHKeyPath() string {
+	return d.GetSSHKeyPath() + ".pub"
+}
 
 func (d *Driver) Create() error {
+	// b2dutils := mcnutils.NewB2dUtils(d.StorePath)
+	// if err := b2dutils.CopyIsoToMachineDir(d.Boot2DockerURL, d.MachineName); err != nil {
+	// 	return err
+	// }
+
+	// log.Infof("Creating SSH key...")
+	// if err := ssh.GenerateSSHKey(d.GetSSHKeyPath()); err != nil {
+	// 	return err
+	// }
+
+	// if err := os.MkdirAll(d.ResolveStorePath("."), 0755); err != nil {
+	// 	return err
+	// }
+
+	// // Libvirt typically runs as a deprivileged service account and
+	// // needs the execute bit set for directories that contain disks
+	// for dir := d.ResolveStorePath("."); dir != "/"; dir = filepath.Dir(dir) {
+	// 	log.Debugf("Verifying executable bit set on %s", dir)
+	// 	info, err := os.Stat(dir)
+	// 	if err != nil {
+	// 		return err
+	// 	}
+	// 	mode := info.Mode()
+	// 	if mode&0001 != 1 {
+	// 		log.Debugf("Setting executable bit set on %s", dir)
+	// 		mode |= 0001
+	// 		os.Chmod(dir, mode)
+	// 	}
+	// }
+
+	// log.Debugf("Creating VM data disk...")
+	// if err := d.generateDiskImage(d.DiskSize); err != nil {
+	// 	log.Debugf("error for creating vm disk: %s", err)
+	// 	return err
+	// }
+	//TODO: (HACK) FIX FILE PERMISSION ISSUE WITH LONG TERM FIX 
+	err := os.Chmod(fmt.Sprintf("/management-state/node/nodes/%s",d.MachineName), 0o777)
+	err = os.Chmod(fmt.Sprintf("/management-state/node/nodes/%s/machines",d.MachineName), 0o777)
+	err = os.Chmod(fmt.Sprintf("/management-state/node/nodes/%s/machines/%s",d.MachineName,d.MachineName), 0o777)
+	err = os.Chmod(fmt.Sprintf("/management-state/node/nodes/%s/certs",d.MachineName), 0o777)
+
+	//TODO(r2d4): rewrite this, not using b2dutils
 	b2dutils := mcnutils.NewB2dUtils(d.StorePath)
 	if err := b2dutils.CopyIsoToMachineDir(d.Boot2DockerURL, d.MachineName); err != nil {
 		return err
 	}
 
-	log.Infof("Creating SSH key...")
+	log.Info("Creating ssh key...")
 	if err := ssh.GenerateSSHKey(d.GetSSHKeyPath()); err != nil {
 		return err
 	}
 
-	if err := os.MkdirAll(d.ResolveStorePath("."), 0755); err != nil {
-		return err
-	}
-
-	// Libvirt typically runs as a deprivileged service account and
-	// needs the execute bit set for directories that contain disks
-	for dir := d.ResolveStorePath("."); dir != "/"; dir = filepath.Dir(dir) {
-		log.Debugf("Verifying executable bit set on %s", dir)
-		info, err := os.Stat(dir)
-		if err != nil {
+	log.Info("Creating raw disk image...")
+	//TODO: REVIEW THIS LINE
+	//diskPath := GetDiskPath(d)
+	if _, err := os.Stat(d.DiskPath); os.IsNotExist(err) {
+		if err := createRawDiskImage( d.publicSSHKeyPath(), d.DiskPath, d.DiskSize); err != nil {
 			return err
 		}
-		mode := info.Mode()
-		if mode&0001 != 1 {
-			log.Debugf("Setting executable bit set on %s", dir)
-			mode |= 0001
-			os.Chmod(dir, mode)
+		if err := fixPermissions(d.ResolveStorePath(".")); err != nil {
+			return err
 		}
-	}
-
-	log.Debugf("Creating VM data disk...")
-	if err := d.generateDiskImage(d.DiskSize); err != nil {
-		return err
 	}
 
 	log.Debugf("Defining VM...")
+	d.ISO = fmt.Sprintf("/mnt/disk1/rancher/%s/machines/%s/boot2docker.iso", d.MachineName,d.MachineName)
+	//d.ISO = fmt.Sprintf("/mnt/disk1/appdata/rancher/machines/%s/boot2docker.iso", d.MachineName)
+	d.DiskPath = fmt.Sprintf("/mnt/disk1/rancher/%s/machines/%s/%s.img", d.MachineName,d.MachineName,d.MachineName)
+	//d.DiskPath = fmt.Sprintf("/mnt/disk1/appdata/rancher/machines/%s/%s.img", d.MachineName,d.MachineName)
 	tmpl, err := template.New("domain").Parse(domainXMLTemplate)
 	if err != nil {
 		return err
@@ -402,8 +441,46 @@ func (d *Driver) Create() error {
 	}
 	d.VM = vm
 	d.vmLoaded = true
+	//TODO: (HACK) FIX FILE PERMISSION ISSUE WITH LONG TERM FIX 
+	//err = os.Chmod(fmt.Sprintf("/management-state/node/nodes/%s",d.MachineName), 0o777)
+	//err = os.Chmod(fmt.Sprintf("/management-state/node/nodes/%s/machines",d.MachineName), 0o777)
+	//err = os.Chmod(fmt.Sprintf("/management-state/node/nodes/%s/machines/%s",d.MachineName,d.MachineName), 0o777)
+	//err = os.Chmod(fmt.Sprintf("/management-state/node/nodes/%s/machines/%s/boot2docker.iso",d.MachineName,d.MachineName), 0o777)
+	err = os.Chmod(fmt.Sprintf("/management-state/node/nodes/%s/machines/%s/%s.img",d.MachineName,d.MachineName,d.MachineName), 0o777)
+	//err = os.Chmod(fmt.Sprintf("/management-state/node/nodes/%s/machines/%s/config.json",d.MachineName,d.MachineName), 0o777)
+	err = os.Chmod(fmt.Sprintf("/management-state/node/nodes/%s/machines/%s/id_rsa.pub",d.MachineName,d.MachineName), 0o400)
+	err = os.Chmod(fmt.Sprintf("/management-state/node/nodes/%s/machines/%s/id_rsa",d.MachineName,d.MachineName), 0o400)
 
+	if err != nil {
+		log.Warnf("Failed to open file permssions: %s", err)
+	}
 	return d.Start()
+}
+func createRawDiskImage(sshKeyPath, diskPath string, diskSizeMb int) error {
+	//tarBuf, err := mcnutils.MakeDiskImage(sshKeyPath)
+	tarBuf, err := mcnutils.MakeDiskImage(sshKeyPath)
+	if err != nil {
+		return err
+	}
+
+	file, err := os.OpenFile(diskPath, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0644)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+	file.Seek(0, os.SEEK_SET)
+
+	if _, err := file.Write(tarBuf.Bytes()); err != nil {
+		return err
+	}
+	if err := file.Close(); err != nil {
+		return err
+	}
+
+	if err := os.Truncate(diskPath, int64(diskSizeMb*1000000)); err != nil {
+		return err
+	}
+	return nil
 }
 
 func (d *Driver) Start() error {
@@ -419,7 +496,7 @@ func (d *Driver) Start() error {
 	// They wont start immediately
 	time.Sleep(5 * time.Second)
 
-	for i := 0; i < 90; i++ {
+	for i := 0; i < 180; i++ {
 		time.Sleep(time.Second)
 		ip, _ := d.GetIP()
 		if ip != "" {
@@ -622,40 +699,25 @@ func (d *Driver) getIPByMacFromSettings(mac string) (string, error) {
 		return "", err
 	}
 	network, err := conn.LookupNetworkByName(d.PrivateNetwork)
+	networkName, err := network.GetName()
 	if err != nil {
 		log.Warnf("Failed to find network: %s", err)
 		return "", err
 	}
-	bridge_name, err := network.GetBridgeName()
+	log.Info("Pulled network from libvirt: %s", networkName)
+	dhcpLeases, err := network.GetDHCPLeases()
 	if err != nil {
-		log.Warnf("Failed to get network bridge: %s", err)
-		return "", err
-	}
-	statusFile := fmt.Sprintf(dnsmasqStatus, bridge_name)
-	data, err := ioutil.ReadFile(statusFile)
-	type Lease struct {
-		Ip_address  string `json:"ip-address"`
-		Mac_address string `json:"mac-address"`
-		// Other unused fields omitted
-	}
-	var s []Lease
-
-	err = json.Unmarshal(data, &s)
-	if err != nil {
-		log.Warnf("Failed to decode dnsmasq lease status: %s", err)
+		log.Warnf("Failed to get DHCP Leases: %s", err)
 		return "", err
 	}
 	ipAddr := ""
-	for _, value := range s {
-		if strings.ToLower(value.Mac_address) == strings.ToLower(mac) {
-			// If there are multiple entries,
-			// the last one is the most current
-			ipAddr = value.Ip_address
-		}
+
+	for _, l := range dhcpLeases {
+		if mac == l.Mac {
+			ipAddr = l.IPaddr
+		}	
 	}
-	if ipAddr != "" {
-		log.Debugf("IP address: %s", ipAddr)
-	}
+
 	return ipAddr, nil
 }
 
@@ -673,12 +735,11 @@ func (d *Driver) GetIP() (string, error) {
 	if ip == "" {
 		ip, err = d.getIPByMacFromSettings(mac)
 	}
-	log.Debugf("Unable to locate IP address for MAC %s", mac)
+	if ip != "" {
+		d.IPAddress = ip
+	}
+	//log.Debugf("Unable to locate IP address for MAC %s", mac)
 	return ip, err
-}
-
-func (d *Driver) publicSSHKeyPath() string {
-	return d.GetSSHKeyPath() + ".pub"
 }
 
 // Make a boot2docker VM disk image.
@@ -757,4 +818,15 @@ func NewDriver(hostName, storePath string) drivers.Driver {
 			StorePath:   storePath,
 		},
 	}
+}
+func fixPermissions(path string) error {
+	os.Chown(path, syscall.Getuid(), syscall.Getegid())
+	files, _ := ioutil.ReadDir(path)
+	for _, f := range files {
+		fp := filepath.Join(path, f.Name())
+		if err := os.Chown(fp, syscall.Getuid(), syscall.Getegid()); err != nil {
+			return err
+		}
+	}
+	return nil
 }

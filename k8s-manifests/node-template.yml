@@ -1,0 +1,37 @@
+apiVersion: management.cattle.io/v3
+kind: NodeTemplate
+kvmConfig:
+  boot2dockerUrl: https://github.com/boot2docker/boot2docker/releases/download/v19.03.12/boot2docker.iso
+  cacheMode: default
+  cpuCount: "1"
+  diskSize: "2000"
+  ioMode: threads
+  memory: "1024"
+  network: default
+  sshUser: docker
+metadata:
+  annotations:
+    field.cattle.io/creatorId: user-g8qfh
+    ownerBindingsCreated: "true"
+  creationTimestamp: "2021-02-22T00:37:44Z"
+  generateName: nt-
+  generation: 1
+  labels:
+    cattle.io/creator: norman
+    manager: rancher
+    operation: Update
+  name: nt-rpjfk
+  namespace: cattle-global-nt
+  resourceVersion: "7131"
+  selfLink: /apis/management.cattle.io/v3/namespaces/cattle-global-nt/nodetemplates/nt-rpjfk
+  uid: aaebcb15-d2cc-4a90-bb69-8d1691a6cd71
+spec:
+  displayName: test
+  driver: kvm
+  engineEnv: {}
+  engineInstallURL: https://releases.rancher.com/install-docker/19.03.sh
+  engineLabel: {}
+  engineOpt: {}
+  engineRegistryMirror: []
+  engineStorageDriver: ""
+  useInternalIpAddress: true

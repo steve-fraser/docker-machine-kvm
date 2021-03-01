@@ -1,8 +1,8 @@
 package main
 
 import (
-	"github.com/dhiltgen/docker-machine-kvm"
-	"github.com/docker/machine/libmachine/drivers/plugin"
+	"github.com/steve-fraser/docker-machine-kvm"
+	"github.com/rancher/machine/libmachine/drivers/plugin"
 )
 
 func main() {

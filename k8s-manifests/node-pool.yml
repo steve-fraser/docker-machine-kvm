@@ -1,0 +1,74 @@
+apiVersion: management.cattle.io/v3
+kind: NodePool
+metadata:
+  annotations:
+    field.cattle.io/creatorId: user-8tl8v
+    lifecycle.cattle.io/create.nodepool-provisioner: "true"
+  creationTimestamp: "2021-02-22T02:19:22Z"
+  finalizers:
+  - controller.cattle.io/nodepool-provisioner
+  generateName: np-
+  generation: 3
+  labels:
+    cattle.io/creator: norman
+  managedFields:
+  - apiVersion: management.cattle.io/v3
+    fieldsType: FieldsV1
+    fieldsV1:
+      f:metadata:
+        f:annotations:
+          .: {}
+          f:field.cattle.io/creatorId: {}
+        f:generateName: {}
+        f:labels:
+          .: {}
+          f:cattle.io/creator: {}
+      f:spec:
+        .: {}
+        f:clusterName: {}
+        f:controlPlane: {}
+        f:deleteNotReadyAfterSecs: {}
+        f:etcd: {}
+        f:hostnamePrefix: {}
+        f:nodeTemplateName: {}
+        f:quantity: {}
+        f:worker: {}
+    manager: Go-http-client
+    operation: Update
+    time: "2021-02-22T02:19:22Z"
+  - apiVersion: management.cattle.io/v3
+    fieldsType: FieldsV1
+    fieldsV1:
+      f:metadata:
+        f:annotations:
+          f:lifecycle.cattle.io/create.nodepool-provisioner: {}
+        f:finalizers: {}
+      f:spec:
+        f:displayName: {}
+        f:nodeAnnotations: {}
+        f:nodeLabels: {}
+      f:status:
+        .: {}
+        f:conditions: {}
+    manager: rancher
+    operation: Update
+    time: "2021-02-22T02:19:22Z"
+  name: np-hcz4d
+  namespace: kvm
+spec:
+  clusterName: kvm
+  controlPlane: true
+  deleteNotReadyAfterSecs: 0
+  displayName: ""
+  etcd: true
+  hostnamePrefix: test-new
+  nodeAnnotations: null
+  nodeLabels: null
+  nodeTemplateName: cattle-global-nt:nt-rpjfk
+  quantity: 1
+  worker: true
+status:
+  conditions:
+  - lastUpdateTime: "2021-02-22T02:19:22Z"
+    status: "True"
+    type: Updated
