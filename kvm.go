@@ -496,7 +496,7 @@ func (d *Driver) Start() error {
 	// They wont start immediately
 	time.Sleep(5 * time.Second)
 
-	for i := 0; i < 90; i++ {
+	for i := 0; i < 190; i++ {
 		time.Sleep(time.Second)
 		ip, _ := d.GetIP()
 		if ip != "" {
