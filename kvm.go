@@ -387,10 +387,10 @@ func (d *Driver) Create() error {
 	// 	return err
 	// }
 	//TODO: (HACK) FIX FILE PERMISSION ISSUE WITH LONG TERM FIX 
-	err := os.Chmod(fmt.Sprintf("/management-state/node/nodes/%s",d.MachineName), 0o777)
-	err = os.Chmod(fmt.Sprintf("/management-state/node/nodes/%s/machines",d.MachineName), 0o777)
-	err = os.Chmod(fmt.Sprintf("/management-state/node/nodes/%s/machines/%s",d.MachineName,d.MachineName), 0o777)
-	err = os.Chmod(fmt.Sprintf("/management-state/node/nodes/%s/certs",d.MachineName), 0o777)
+	//err := os.Chmod(fmt.Sprintf("/management-state/node/nodes/%s",d.MachineName), 0o777)
+	//err = os.Chmod(fmt.Sprintf("/management-state/node/nodes/%s/machines",d.MachineName), 0o777)
+	//err = os.Chmod(fmt.Sprintf("/management-state/node/nodes/%s/machines/%s",d.MachineName,d.MachineName), 0o777)
+	//err = os.Chmod(fmt.Sprintf("/management-state/node/nodes/%s/certs",d.MachineName), 0o777)
 
 	//TODO(r2d4): rewrite this, not using b2dutils
 	b2dutils := mcnutils.NewB2dUtils(d.StorePath)
@@ -442,12 +442,12 @@ func (d *Driver) Create() error {
 	d.VM = vm
 	d.vmLoaded = true
 	//TODO: (HACK) FIX FILE PERMISSION ISSUE WITH LONG TERM FIX 
-	//err = os.Chmod(fmt.Sprintf("/management-state/node/nodes/%s",d.MachineName), 0o777)
-	//err = os.Chmod(fmt.Sprintf("/management-state/node/nodes/%s/machines",d.MachineName), 0o777)
-	//err = os.Chmod(fmt.Sprintf("/management-state/node/nodes/%s/machines/%s",d.MachineName,d.MachineName), 0o777)
-	//err = os.Chmod(fmt.Sprintf("/management-state/node/nodes/%s/machines/%s/boot2docker.iso",d.MachineName,d.MachineName), 0o777)
+	err = os.Chmod(fmt.Sprintf("/management-state/node/nodes/%s",d.MachineName), 0o777)
+	err = os.Chmod(fmt.Sprintf("/management-state/node/nodes/%s/machines",d.MachineName), 0o777)
+	err = os.Chmod(fmt.Sprintf("/management-state/node/nodes/%s/machines/%s",d.MachineName,d.MachineName), 0o777)
+	err = os.Chmod(fmt.Sprintf("/management-state/node/nodes/%s/machines/%s/boot2docker.iso",d.MachineName,d.MachineName), 0o777)
 	err = os.Chmod(fmt.Sprintf("/management-state/node/nodes/%s/machines/%s/%s.img",d.MachineName,d.MachineName,d.MachineName), 0o777)
-	//err = os.Chmod(fmt.Sprintf("/management-state/node/nodes/%s/machines/%s/config.json",d.MachineName,d.MachineName), 0o777)
+	err = os.Chmod(fmt.Sprintf("/management-state/node/nodes/%s/machines/%s/config.json",d.MachineName,d.MachineName), 0o777)
 	err = os.Chmod(fmt.Sprintf("/management-state/node/nodes/%s/machines/%s/id_rsa.pub",d.MachineName,d.MachineName), 0o400)
 	err = os.Chmod(fmt.Sprintf("/management-state/node/nodes/%s/machines/%s/id_rsa",d.MachineName,d.MachineName), 0o400)
 
@@ -736,7 +736,7 @@ func (d *Driver) GetIP() (string, error) {
 		ip, err = d.getIPByMacFromSettings(mac)
 	}
 	if ip != "" {
-		d.IPAddress = ip
+	 	d.IPAddress = ip
 	}
 	//log.Debugf("Unable to locate IP address for MAC %s", mac)
 	return ip, err
