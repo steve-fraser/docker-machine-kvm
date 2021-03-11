@@ -66,6 +66,7 @@ const (
     <interface type='network'>
 	  <source network='{{.PrivateNetwork}}'/>
 	  <model type='virtio'/>
+	  <target dev='vnet2'/>
     </interface>
   </devices>
 </domain>`
@@ -94,6 +95,7 @@ type Driver struct {
 	DiskPath         string
 	CacheMode        string
 	IOMode           string
+	LibvirtdHostPath string
 	connectionString string
 	conn             *libvirt.Connect
 	VM               *libvirt.Domain
@@ -145,6 +147,12 @@ func (d *Driver) GetCreateFlags() []mcnflag.Flag {
 			Usage:  "SSH username",
 			Value:  defaultSSHUser,
 		},
+		mcnflag.StringFlag{
+			EnvVar: "KVM_LIBVIRTD_HOST_PATH",
+			Name:   "kvm-libvirtd-host-path",
+			Usage:  "Location of iso and disk on the libvirtd host",
+			Value:  "",
+		},
 		/* Not yet implemented
 		mcnflag.Flag{
 			Name:  "kvm-no-share",
@@ -195,6 +203,7 @@ func (d *Driver) SetConfigFromFlags(flags drivers.DriverOptions) error {
 	d.Boot2DockerURL = flags.String("kvm-boot2docker-url")
 	d.CacheMode = flags.String("kvm-cache-mode")
 	d.IOMode = flags.String("kvm-io-mode")
+	d.LibvirtdHostPath = flags.String("kvm-libvirtd-host-path")
 
 	d.SwarmMaster = flags.Bool("swarm-master")
 	d.SwarmHost = flags.String("swarm-host")
@@ -416,10 +425,10 @@ func (d *Driver) Create() error {
 	}
 
 	log.Debugf("Defining VM...")
-	d.ISO = fmt.Sprintf("/mnt/disk1/rancher/%s/machines/%s/boot2docker.iso", d.MachineName,d.MachineName)
-	//d.ISO = fmt.Sprintf("/mnt/disk1/appdata/rancher/machines/%s/boot2docker.iso", d.MachineName)
-	d.DiskPath = fmt.Sprintf("/mnt/disk1/rancher/%s/machines/%s/%s.img", d.MachineName,d.MachineName,d.MachineName)
-	//d.DiskPath = fmt.Sprintf("/mnt/disk1/appdata/rancher/machines/%s/%s.img", d.MachineName,d.MachineName)
+	if d.LibvirtdHostPath != "" {
+		d.ISO = fmt.Sprintf("%s/%s/machines/%s/boot2docker.iso",d.LibvirtdHostPath, d.MachineName,d.MachineName)
+		d.DiskPath = fmt.Sprintf("%s/%s/machines/%s/%s.img",d.LibvirtdHostPath, d.MachineName,d.MachineName,d.MachineName)
+	}
 	tmpl, err := template.New("domain").Parse(domainXMLTemplate)
 	if err != nil {
 		return err
@@ -494,9 +503,9 @@ func (d *Driver) Start() error {
 	}
 
 	// They wont start immediately
-	time.Sleep(5 * time.Second)
+	time.Sleep(100 * time.Second)
 
-	for i := 0; i < 190; i++ {
+	for i := 0; i < 350; i++ {
 		time.Sleep(time.Second)
 		ip, _ := d.GetIP()
 		if ip != "" {
