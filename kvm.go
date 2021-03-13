@@ -27,7 +27,7 @@ import (
 )
 
 const (
-	connectionString   = "qemu+tcp://192.168.7.67/system"
+	connectionString   = "qemu:///system"
 	privateNetworkName = "docker-machines"
 	isoFilename        = "boot2docker.iso"
 	dnsmasqLeases      = "/var/lib/libvirt/dnsmasq/%s.leases"
@@ -96,7 +96,7 @@ type Driver struct {
 	CacheMode        string
 	IOMode           string
 	LibvirtdHostPath string
-	connectionString string
+	ConnectionString string
 	conn             *libvirt.Connect
 	VM               *libvirt.Domain
 	vmLoaded         bool
@@ -119,7 +119,6 @@ func (d *Driver) GetCreateFlags() []mcnflag.Flag {
 			Usage: "Number of CPUs",
 			Value: 1,
 		},
-		// TODO - support for multiple networks
 		mcnflag.StringFlag{
 			Name:  "kvm-network",
 			Usage: "Name of network to connect to",
@@ -153,12 +152,12 @@ func (d *Driver) GetCreateFlags() []mcnflag.Flag {
 			Usage:  "Location of iso and disk on the libvirtd host",
 			Value:  "",
 		},
-		/* Not yet implemented
-		mcnflag.Flag{
-			Name:  "kvm-no-share",
-			Usage: "Disable the mount of your home directory",
-		},
-		*/
+		mcnflag.StringFlag{
+			EnvVar: "KVM_LIBVIRTD_CONNECTION_STRING",
+			Name:   "kvm-libvirtd-connection-string",
+			Usage:  "Libvirtd connection string",
+			Value:  connectionString,
+		}
 	}
 }
 
@@ -204,7 +203,7 @@ func (d *Driver) SetConfigFromFlags(flags drivers.DriverOptions) error {
 	d.CacheMode = flags.String("kvm-cache-mode")
 	d.IOMode = flags.String("kvm-io-mode")
 	d.LibvirtdHostPath = flags.String("kvm-libvirtd-host-path")
-
+	d.ConnectionString = flags.String("kvm-libvirtd-connection-string")
 	d.SwarmMaster = flags.Bool("swarm-master")
 	d.SwarmHost = flags.String("swarm-host")
 	d.SwarmDiscovery = flags.String("swarm-discovery")
@@ -230,7 +229,7 @@ func (d *Driver) GetURL() (string, error) {
 
 func (d *Driver) getConn() (*libvirt.Connect, error) {
 	if d.conn == nil {
-		conn, err := libvirt.NewConnect(connectionString)
+		conn, err := libvirt.NewConnect(d.ConnectionString)
 		if err != nil {
 			log.Errorf("Failed to connect to libvirt: %s", err)
 			return &libvirt.Connect{}, errors.New("Unable to connect to kvm driver, did you add yourself to the libvirtd group?")
