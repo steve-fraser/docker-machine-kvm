@@ -66,7 +66,6 @@ const (
     <interface type='network'>
 	  <source network='{{.PrivateNetwork}}'/>
 	  <model type='virtio'/>
-	  <target dev='vnet2'/>
     </interface>
   </devices>
 </domain>`
