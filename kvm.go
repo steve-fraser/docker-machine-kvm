@@ -157,7 +157,7 @@ func (d *Driver) GetCreateFlags() []mcnflag.Flag {
 			Name:   "kvm-libvirtd-connection-string",
 			Usage:  "Libvirtd connection string",
 			Value:  connectionString,
-		}
+		},
 	}
 }
 
