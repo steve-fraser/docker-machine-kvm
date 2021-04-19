@@ -358,46 +358,6 @@ func (d *Driver) publicSSHKeyPath() string {
 }
 
 func (d *Driver) Create() error {
-	// b2dutils := mcnutils.NewB2dUtils(d.StorePath)
-	// if err := b2dutils.CopyIsoToMachineDir(d.Boot2DockerURL, d.MachineName); err != nil {
-	// 	return err
-	// }
-
-	// log.Infof("Creating SSH key...")
-	// if err := ssh.GenerateSSHKey(d.GetSSHKeyPath()); err != nil {
-	// 	return err
-	// }
-
-	// if err := os.MkdirAll(d.ResolveStorePath("."), 0755); err != nil {
-	// 	return err
-	// }
-
-	// // Libvirt typically runs as a deprivileged service account and
-	// // needs the execute bit set for directories that contain disks
-	// for dir := d.ResolveStorePath("."); dir != "/"; dir = filepath.Dir(dir) {
-	// 	log.Debugf("Verifying executable bit set on %s", dir)
-	// 	info, err := os.Stat(dir)
-	// 	if err != nil {
-	// 		return err
-	// 	}
-	// 	mode := info.Mode()
-	// 	if mode&0001 != 1 {
-	// 		log.Debugf("Setting executable bit set on %s", dir)
-	// 		mode |= 0001
-	// 		os.Chmod(dir, mode)
-	// 	}
-	// }
-
-	// log.Debugf("Creating VM data disk...")
-	// if err := d.generateDiskImage(d.DiskSize); err != nil {
-	// 	log.Debugf("error for creating vm disk: %s", err)
-	// 	return err
-	// }
-	//TODO: (HACK) FIX FILE PERMISSION ISSUE WITH LONG TERM FIX 
-	//err := os.Chmod(fmt.Sprintf("/management-state/node/nodes/%s",d.MachineName), 0o777)
-	//err = os.Chmod(fmt.Sprintf("/management-state/node/nodes/%s/machines",d.MachineName), 0o777)
-	//err = os.Chmod(fmt.Sprintf("/management-state/node/nodes/%s/machines/%s",d.MachineName,d.MachineName), 0o777)
-	//err = os.Chmod(fmt.Sprintf("/management-state/node/nodes/%s/certs",d.MachineName), 0o777)
 
 	//TODO(r2d4): rewrite this, not using b2dutils
 	b2dutils := mcnutils.NewB2dUtils(d.StorePath)
@@ -421,7 +381,9 @@ func (d *Driver) Create() error {
 			return err
 		}
 	}
-
+	log.Info("Testing ISO Path: %s",d.ISO)
+	log.Info("Testing DISK Path: %s",d.DiskPath)
+	log.Info("Testing Local Path Resolve: %s",d.ResolveStorePath("."))
 	log.Debugf("Defining VM...")
 	if d.LibvirtdHostPath != "" {
 		d.ISO = fmt.Sprintf("%s/%s/machines/%s/boot2docker.iso",d.LibvirtdHostPath, d.MachineName,d.MachineName)
@@ -463,6 +425,13 @@ func (d *Driver) Create() error {
 	}
 	return d.Start()
 }
+
+// func prepareKVMDiskAndISO(diskPath string, isoPath string) error {
+
+
+// }
+
+
 func createRawDiskImage(sshKeyPath, diskPath string, diskSizeMb int) error {
 	//tarBuf, err := mcnutils.MakeDiskImage(sshKeyPath)
 	tarBuf, err := mcnutils.MakeDiskImage(sshKeyPath)
