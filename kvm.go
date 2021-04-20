@@ -84,6 +84,7 @@ type Driver struct {
 
 	Memory           int
 	DiskSize         int
+	Timeout         int
 	CPU              int
 	Network          string
 	PrivateNetwork   string
@@ -112,6 +113,11 @@ func (d *Driver) GetCreateFlags() []mcnflag.Flag {
 			Name:  "kvm-disk-size",
 			Usage: "Size of disk for host in MB",
 			Value: 20000,
+		},
+		mcnflag.IntFlag{
+			Name:  "kvm-timeout",
+			Usage: "Number of Seconds to wait for VM to come up",
+			Value: 90,
 		},
 		mcnflag.IntFlag{
 			Name:  "kvm-cpu-count",
@@ -196,6 +202,7 @@ func (d *Driver) SetConfigFromFlags(flags drivers.DriverOptions) error {
 	log.Debugf("SetConfigFromFlags called")
 	d.Memory = flags.Int("kvm-memory")
 	d.DiskSize = flags.Int("kvm-disk-size")
+	d.Timeout = flags.Int("kvm-timeout")	
 	d.CPU = flags.Int("kvm-cpu-count")
 	d.Network = flags.String("kvm-network")
 	d.Boot2DockerURL = flags.String("kvm-boot2docker-url")
@@ -383,9 +390,10 @@ func (d *Driver) Create() error {
 	}
 	log.Info("Testing ISO Path: %s",d.ISO)
 	log.Info("Testing DISK Path: %s",d.DiskPath)
-	log.Info("Testing Local Path Resolve: %s",d.ResolveStorePath("."))
+	log.Info("Testing Local Path: %s",d.ResolveStorePath("."))
 	log.Debugf("Defining VM...")
 	if d.LibvirtdHostPath != "" {
+		
 		d.ISO = fmt.Sprintf("%s/%s/machines/%s/boot2docker.iso",d.LibvirtdHostPath, d.MachineName,d.MachineName)
 		d.DiskPath = fmt.Sprintf("%s/%s/machines/%s/%s.img",d.LibvirtdHostPath, d.MachineName,d.MachineName,d.MachineName)
 	}
@@ -470,7 +478,7 @@ func (d *Driver) Start() error {
 	}
 
 	// They wont start immediately
-	time.Sleep(100 * time.Second)
+	time.Sleep(time.Duration(d.Timeout) * time.Second)
 
 	for i := 0; i < 350; i++ {
 		time.Sleep(time.Second)
