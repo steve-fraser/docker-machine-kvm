@@ -84,6 +84,7 @@ type Driver struct {
 
 	Memory           int
 	DiskSize         int
+	Timeout         int
 	CPU              int
 	Network          string
 	PrivateNetwork   string
@@ -112,6 +113,11 @@ func (d *Driver) GetCreateFlags() []mcnflag.Flag {
 			Name:  "kvm-disk-size",
 			Usage: "Size of disk for host in MB",
 			Value: 20000,
+		},
+		mcnflag.IntFlag{
+			Name:  "kvm-timeout",
+			Usage: "Number of Seconds to wait for VM to come up",
+			Value: 90,
 		},
 		mcnflag.IntFlag{
 			Name:  "kvm-cpu-count",
@@ -196,6 +202,7 @@ func (d *Driver) SetConfigFromFlags(flags drivers.DriverOptions) error {
 	log.Debugf("SetConfigFromFlags called")
 	d.Memory = flags.Int("kvm-memory")
 	d.DiskSize = flags.Int("kvm-disk-size")
+	d.Timeout = flags.Int("kvm-timeout")	
 	d.CPU = flags.Int("kvm-cpu-count")
 	d.Network = flags.String("kvm-network")
 	d.Boot2DockerURL = flags.String("kvm-boot2docker-url")
@@ -358,46 +365,6 @@ func (d *Driver) publicSSHKeyPath() string {
 }
 
 func (d *Driver) Create() error {
-	// b2dutils := mcnutils.NewB2dUtils(d.StorePath)
-	// if err := b2dutils.CopyIsoToMachineDir(d.Boot2DockerURL, d.MachineName); err != nil {
-	// 	return err
-	// }
-
-	// log.Infof("Creating SSH key...")
-	// if err := ssh.GenerateSSHKey(d.GetSSHKeyPath()); err != nil {
-	// 	return err
-	// }
-
-	// if err := os.MkdirAll(d.ResolveStorePath("."), 0755); err != nil {
-	// 	return err
-	// }
-
-	// // Libvirt typically runs as a deprivileged service account and
-	// // needs the execute bit set for directories that contain disks
-	// for dir := d.ResolveStorePath("."); dir != "/"; dir = filepath.Dir(dir) {
-	// 	log.Debugf("Verifying executable bit set on %s", dir)
-	// 	info, err := os.Stat(dir)
-	// 	if err != nil {
-	// 		return err
-	// 	}
-	// 	mode := info.Mode()
-	// 	if mode&0001 != 1 {
-	// 		log.Debugf("Setting executable bit set on %s", dir)
-	// 		mode |= 0001
-	// 		os.Chmod(dir, mode)
-	// 	}
-	// }
-
-	// log.Debugf("Creating VM data disk...")
-	// if err := d.generateDiskImage(d.DiskSize); err != nil {
-	// 	log.Debugf("error for creating vm disk: %s", err)
-	// 	return err
-	// }
-	//TODO: (HACK) FIX FILE PERMISSION ISSUE WITH LONG TERM FIX 
-	//err := os.Chmod(fmt.Sprintf("/management-state/node/nodes/%s",d.MachineName), 0o777)
-	//err = os.Chmod(fmt.Sprintf("/management-state/node/nodes/%s/machines",d.MachineName), 0o777)
-	//err = os.Chmod(fmt.Sprintf("/management-state/node/nodes/%s/machines/%s",d.MachineName,d.MachineName), 0o777)
-	//err = os.Chmod(fmt.Sprintf("/management-state/node/nodes/%s/certs",d.MachineName), 0o777)
 
 	//TODO(r2d4): rewrite this, not using b2dutils
 	b2dutils := mcnutils.NewB2dUtils(d.StorePath)
@@ -421,11 +388,15 @@ func (d *Driver) Create() error {
 			return err
 		}
 	}
-
+	log.Info("Testing ISO Path: %s",d.ISO)
+	log.Info("Testing DISK Path: %s",d.DiskPath)
+	log.Info("Testing Local Path: %s",d.ResolveStorePath("."))
 	log.Debugf("Defining VM...")
+	prepareKVMDiskAndISO(d.DiskPath,d.ISO,d.MachineName)
 	if d.LibvirtdHostPath != "" {
-		d.ISO = fmt.Sprintf("%s/%s/machines/%s/boot2docker.iso",d.LibvirtdHostPath, d.MachineName,d.MachineName)
-		d.DiskPath = fmt.Sprintf("%s/%s/machines/%s/%s.img",d.LibvirtdHostPath, d.MachineName,d.MachineName,d.MachineName)
+		
+		d.ISO = fmt.Sprintf("%s/%s_persistant/boot2docker.iso",d.LibvirtdHostPath, d.MachineName)
+		d.DiskPath = fmt.Sprintf("%s/%s_persistant/%s.img",d.LibvirtdHostPath, d.MachineName,d.MachineName)
 	}
 	tmpl, err := template.New("domain").Parse(domainXMLTemplate)
 	if err != nil {
@@ -452,8 +423,6 @@ func (d *Driver) Create() error {
 	err = os.Chmod(fmt.Sprintf("/management-state/node/nodes/%s",d.MachineName), 0o777)
 	err = os.Chmod(fmt.Sprintf("/management-state/node/nodes/%s/machines",d.MachineName), 0o777)
 	err = os.Chmod(fmt.Sprintf("/management-state/node/nodes/%s/machines/%s",d.MachineName,d.MachineName), 0o777)
-	err = os.Chmod(fmt.Sprintf("/management-state/node/nodes/%s/machines/%s/boot2docker.iso",d.MachineName,d.MachineName), 0o777)
-	err = os.Chmod(fmt.Sprintf("/management-state/node/nodes/%s/machines/%s/%s.img",d.MachineName,d.MachineName,d.MachineName), 0o777)
 	err = os.Chmod(fmt.Sprintf("/management-state/node/nodes/%s/machines/%s/config.json",d.MachineName,d.MachineName), 0o777)
 	err = os.Chmod(fmt.Sprintf("/management-state/node/nodes/%s/machines/%s/id_rsa.pub",d.MachineName,d.MachineName), 0o400)
 	err = os.Chmod(fmt.Sprintf("/management-state/node/nodes/%s/machines/%s/id_rsa",d.MachineName,d.MachineName), 0o400)
@@ -463,6 +432,26 @@ func (d *Driver) Create() error {
 	}
 	return d.Start()
 }
+
+func prepareKVMDiskAndISO(diskPath string, isoPath string, machineName string) error {
+	err := os.Mkdir(fmt.Sprintf("/management-state/node/nodes/%s_persistant",machineName), 0755)
+	if err != nil {
+		return err
+	}
+	diskNewPath := fmt.Sprintf("/management-state/node/nodes/%s_persistant/%s.img",machineName,machineName)
+	isoNewPath := fmt.Sprintf("/management-state/node/nodes/%s_persistant/boot2docker.iso",machineName)
+	err = os.Rename(diskPath, diskNewPath)
+	if err != nil {
+		return err
+	}
+	err = os.Rename(isoPath, isoNewPath)
+	if err != nil {
+		return err
+	}
+	return nil
+ }
+
+
 func createRawDiskImage(sshKeyPath, diskPath string, diskSizeMb int) error {
 	//tarBuf, err := mcnutils.MakeDiskImage(sshKeyPath)
 	tarBuf, err := mcnutils.MakeDiskImage(sshKeyPath)
@@ -501,7 +490,7 @@ func (d *Driver) Start() error {
 	}
 
 	// They wont start immediately
-	time.Sleep(100 * time.Second)
+	time.Sleep(time.Duration(d.Timeout) * time.Second)
 
 	for i := 0; i < 350; i++ {
 		time.Sleep(time.Second)
@@ -551,6 +540,10 @@ func (d *Driver) Remove() error {
 	if err := d.validateVMRef(); err != nil {
 		return err
 	}
+	err := os.RemoveAll(fmt.Sprintf("/management-state/node/nodes/%s_persistant",d.MachineName))
+    if err != nil {
+		return err
+    }
 	// Note: If we switch to qcow disks instead of raw the user
 	//       could take a snapshot.  If you do, then Undefine
 	//       will fail unless we nuke the snapshots first
